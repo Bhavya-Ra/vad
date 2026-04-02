@@ -151,8 +151,12 @@ class SileroV5Model implements VadModel {
       } finally {
         client.close();
       }
+    } else if (modelPath.startsWith('file://')) {
+      // Load from device file system (cross-session cached model)
+      final filePath = modelPath.replaceFirst('file://', '');
+      return await File(filePath).readAsBytes();
     } else {
-      // Load from asset bundle (local file)
+      // Load from Flutter asset bundle
       final rawAssetFile = await rootBundle.load(modelPath);
       return rawAssetFile.buffer.asUint8List();
     }
