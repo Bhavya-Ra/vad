@@ -8,12 +8,10 @@ import 'dart:typed_data';
 // Flutter imports:
 import 'package:flutter/services.dart';
 
-// Package imports:
-import 'package:path_provider/path_provider.dart';
-
 // Project imports:
 import 'package:vad/src/core/vad_event.dart';
 import 'package:vad/src/core/vad_model.dart';
+import 'package:vad/src/utils/model_cache_utils.dart';
 import 'package:vad/src/utils/model_utils.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_session.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_value.dart';
@@ -138,30 +136,13 @@ class SileroV5Model implements VadModel {
   static Future<Uint8List> _loadModelBytes(String modelPath) async {
     if (modelPath.startsWith('http://') || modelPath.startsWith('https://')) {
       // Check disk cache first — avoids re-downloading on every app session.
-      final cacheFile = await _modelCacheFile(modelPath);
+      final cacheFile = await getModelCacheFile(modelPath);
       if (await cacheFile.exists()) {
         return await cacheFile.readAsBytes();
       }
       // Download and persist to disk for future sessions.
-      final client = HttpClient();
-      try {
-        final request = await client.getUrl(Uri.parse(modelPath));
-        final response = await request.close();
-        if (response.statusCode == 200) {
-          final builder = BytesBuilder();
-          await for (final chunk in response) {
-            builder.add(chunk);
-          }
-          final bytes = builder.toBytes();
-          await cacheFile.writeAsBytes(bytes);
-          return bytes;
-        } else {
-          throw Exception(
-              'HTTP ${response.statusCode}: Failed to download model from $modelPath');
-        }
-      } finally {
-        client.close();
-      }
+      await downloadModelToCache(modelPath, cacheFile);
+      return await cacheFile.readAsBytes();
     } else if (modelPath.startsWith('file://')) {
       // Load from device file system (explicit path override).
       final filePath = modelPath.replaceFirst('file://', '');
@@ -171,13 +152,5 @@ class SileroV5Model implements VadModel {
       final rawAssetFile = await rootBundle.load(modelPath);
       return rawAssetFile.buffer.asUint8List();
     }
-  }
-
-  /// Returns a stable cache [File] for a given CDN URL.
-  /// Uses the URL's last path segment as the filename (e.g. silero_vad_v5.onnx).
-  static Future<File> _modelCacheFile(String url) async {
-    final dir = await getApplicationSupportDirectory();
-    final fileName = Uri.parse(url).pathSegments.last;
-    return File('${dir.path}/$fileName');
   }
 }

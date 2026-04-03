@@ -4,6 +4,7 @@
 
 // Dart imports:
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 // Package imports:
@@ -12,6 +13,8 @@ import 'package:record/record.dart';
 // Project imports:
 import 'package:vad/src/core/vad_iterator.dart';
 import 'package:vad/src/core/vad_event.dart';
+import 'package:vad/src/utils/model_cache_utils.dart';
+import 'package:vad/src/utils/model_utils.dart';
 
 /// Platform-agnostic Voice Activity Detection handler for real-time audio processing
 ///
@@ -441,6 +444,22 @@ class VadHandler {
   ///
   /// Uses unified implementation with record library for both web and native platforms.
   /// Supports Silero VAD models v4 and v5.
+  /// Pre-downloads and caches the VAD model to device storage before [startListening].
+  /// Safe to call multiple times — exits immediately if the file is already cached.
+  /// [baseAssetPath] should be the same value passed to [startListening].
+  /// Throws on download failure — callers should wrap in try/catch if silent fallback is needed.
+  static Future<void> prefetchModel({
+    String baseAssetPath =
+        'https://cdn.jsdelivr.net/npm/@keyurmaru/vad@0.0.1/',
+    String model = 'v5',
+  }) async {
+    final modelUrl = getModelUrl(baseAssetPath, model);
+    if (!modelUrl.startsWith('http://') && !modelUrl.startsWith('https://')) return;
+    final cacheFile = await getModelCacheFile(modelUrl);
+    if (await cacheFile.exists()) return;
+    await downloadModelToCache(modelUrl, cacheFile);
+  }
+
   static VadHandler create({bool isDebug = false}) {
     return VadHandler._(isDebug: isDebug);
   }
