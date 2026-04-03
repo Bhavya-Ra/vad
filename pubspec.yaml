@@ -35,6 +35,7 @@ flutter:
 dependencies:
   flutter:
     sdk: flutter
+  path_provider: 2.1.2
   ffi: ^2.1.4
   record: ^6.1.2
   web: ^1.1.1

@@ -8,6 +8,9 @@ import 'dart:typed_data';
 // Flutter imports:
 import 'package:flutter/services.dart';
 
+// Package imports:
+import 'package:path_provider/path_provider.dart';
+
 // Project imports:
 import 'package:vad/src/core/vad_event.dart';
 import 'package:vad/src/core/vad_model.dart';
@@ -134,16 +137,24 @@ class SileroV5Model implements VadModel {
 
   static Future<Uint8List> _loadModelBytes(String modelPath) async {
     if (modelPath.startsWith('http://') || modelPath.startsWith('https://')) {
+      // Check disk cache first — avoids re-downloading on every app session.
+      final cacheFile = await _modelCacheFile(modelPath);
+      if (await cacheFile.exists()) {
+        return await cacheFile.readAsBytes();
+      }
+      // Download and persist to disk for future sessions.
       final client = HttpClient();
       try {
         final request = await client.getUrl(Uri.parse(modelPath));
         final response = await request.close();
         if (response.statusCode == 200) {
-          final completer = BytesBuilder();
+          final builder = BytesBuilder();
           await for (final chunk in response) {
-            completer.add(chunk);
+            builder.add(chunk);
           }
-          return completer.toBytes();
+          final bytes = builder.toBytes();
+          await cacheFile.writeAsBytes(bytes);
+          return bytes;
         } else {
           throw Exception(
               'HTTP ${response.statusCode}: Failed to download model from $modelPath');
@@ -152,13 +163,21 @@ class SileroV5Model implements VadModel {
         client.close();
       }
     } else if (modelPath.startsWith('file://')) {
-      // Load from device file system (cross-session cached model)
+      // Load from device file system (explicit path override).
       final filePath = modelPath.replaceFirst('file://', '');
       return await File(filePath).readAsBytes();
     } else {
-      // Load from Flutter asset bundle
+      // Load from Flutter asset bundle.
       final rawAssetFile = await rootBundle.load(modelPath);
       return rawAssetFile.buffer.asUint8List();
     }
+  }
+
+  /// Returns a stable cache [File] for a given CDN URL.
+  /// Uses the URL's last path segment as the filename (e.g. silero_vad_v5.onnx).
+  static Future<File> _modelCacheFile(String url) async {
+    final dir = await getApplicationSupportDirectory();
+    final fileName = Uri.parse(url).pathSegments.last;
+    return File('${dir.path}/$fileName');
   }
 }
