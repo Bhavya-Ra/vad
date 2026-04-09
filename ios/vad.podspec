@@ -19,8 +19,8 @@ VAD is a cross-platform Voice Activity Detection system, allowing Flutter applic
   # `../src/*` so that the C sources can be shared among all target platforms.
   s.source           = { :path => '.' }
   s.dependency 'Flutter'
-  s.dependency 'onnxruntime-objc', '1.22.0'
-  s.platform = :ios, '15.1'
+  s.dependency 'onnxruntime-objc', '1.20.1'
+  s.platform = :ios, '14.0'
   s.static_framework = true
 
   # Flutter.framework does not contain a i386 slice.
